@@ -43,10 +43,8 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr CreateData(std::vector<std::vector<float>> p
 
 }
 
-
 void render2DTree(Node* node, pcl::visualization::PCLVisualizer::Ptr& viewer, Box window, int& iteration, uint depth=0)
 {
-
 	if(node!=NULL)
 	{
 		Box upperWindow = window;
@@ -74,6 +72,20 @@ void render2DTree(Node* node, pcl::visualization::PCLVisualizer::Ptr& viewer, Bo
 	}
 
 }
+void proximity(const std::vector<std::vector<float>>& points, int idx, std::vector<int>& cluster, std::vector<bool>& processed, KdTree* tree, float distanceTol)
+{
+	std::cout << " Processing point " << idx << std::endl;
+	processed[idx] = true;
+	cluster.push_back(idx);
+	std::vector<int> proxPoint = tree->search(points[idx], distanceTol);
+
+	std::cout << " Found " << proxPoint.size() << " proximity points" << std::endl;
+	for (int i : proxPoint)
+		if (!processed[i])
+			proximity(points, i, cluster, processed, tree, distanceTol);
+		else
+			std::cout << " Skipping " << i << " point for " << idx << std::endl;
+}
 
 std::vector<std::vector<int>> euclideanCluster(const std::vector<std::vector<float>>& points, KdTree* tree, float distanceTol)
 {
@@ -81,6 +93,21 @@ std::vector<std::vector<int>> euclideanCluster(const std::vector<std::vector<flo
 	// TODO: Fill out this function to return list of indices for each cluster
 
 	std::vector<std::vector<int>> clusters;
+	std::vector<bool> processed(points.size(), false);	
+	
+	for (size_t i = 0; i < points.size(); ++i)
+	{
+		if (processed[i])
+			continue;
+		std::cout << "Creating cluster from point " << i << std::endl;
+		std::vector<int> cluster;
+		proximity(points, i, cluster, processed, tree, distanceTol);
+
+
+		clusters.push_back(cluster);
+
+
+	}
  
 	return clusters;
 

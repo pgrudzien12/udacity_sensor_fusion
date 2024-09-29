@@ -6,6 +6,8 @@
 #include "../../processPointClouds.h"
 // using templates for processPointClouds so also include .cpp to help linker
 #include "../../processPointClouds.cpp"
+#include <random>
+#include <cmath>
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr CreateData()
 {
@@ -68,7 +70,62 @@ std::unordered_set<int> Ransac(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int ma
 	
 	// TODO: Fill in this function
 
-	// For max iterations 
+	// For max iterations
+	for (int i = 0; i<maxIterations; i++)
+	{
+		std::unordered_set<int> inliers;
+		
+		// Select two random indexes
+		size_t l = cloud->points.size();
+		int index1 = rand() % l;
+		int index2, index3;
+		do {
+			index2 = rand() % l;
+		} while (index1 == index2);
+		do {
+			index3 = rand() % l;
+		} while (index3 == index2 || index3 == index1);
+
+
+		// Get the points corresponding to the random indexes
+		pcl::PointXYZ p1 = cloud->points[index1];
+		pcl::PointXYZ p2 = cloud->points[index2];
+		pcl::PointXYZ p3 = cloud->points[index3];
+		inliers.insert(index1);
+		inliers.insert(index2);
+		inliers.insert(index3);
+		// Ensure the points are not collinear by checking the area of the triangle they form
+        Eigen::Vector3f v1(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z);
+        Eigen::Vector3f v2(p3.x - p1.x, p3.y - p1.y, p3.z - p1.z);
+        Eigen::Vector3f normal = v1.cross(v2);
+        normal.normalize();  // Normalize the normal vector
+
+        if (normal.norm() == 0) {
+            continue; // Skip this iteration if the points are collinear
+        }
+
+        double A = normal[0];
+        double B = normal[1];
+        double C = normal[2];
+		double D = -(A*p1.x + B*p1.y + C*p1.z);
+		
+		// Iterate through all points in the cloud
+		for (int i = 0; i < cloud->points.size(); ++i) {
+			pcl::PointXYZ point = cloud->points[i];
+			
+			// Calculate the perpendicular distance from the point to the line
+			double distance = std::abs(A * point.x + B * point.y + C * point.x + D) / std::sqrt(A * A + B * B + C * C);
+
+			// If the distance is within the tolerance, add the index to inliers
+			if (distance <= distanceTol) {
+				inliers.insert(i);
+			}
+		}
+
+		if (inliersResult.size() < inliers.size())
+			inliersResult = inliers;
+	}    
+	std::cout << "Inliers within distance tolerance:" << inliersResult.size() << std::endl;
 
 	// Randomly sample subset and fit line
 
@@ -88,11 +145,11 @@ int main ()
 	pcl::visualization::PCLVisualizer::Ptr viewer = initScene();
 
 	// Create data
-	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = CreateData();
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = CreateData3D();
 	
 
 	// TODO: Change the max iteration and distance tolerance arguments for Ransac function
-	std::unordered_set<int> inliers = Ransac(cloud, 0, 0);
+	std::unordered_set<int> inliers = Ransac(cloud, 1500, 1);
 
 	pcl::PointCloud<pcl::PointXYZ>::Ptr  cloudInliers(new pcl::PointCloud<pcl::PointXYZ>());
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloudOutliers(new pcl::PointCloud<pcl::PointXYZ>());
